@@ -1,11 +1,27 @@
--- Enable PostGIS extension
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS postgis_topology;
+-- Safe extension and spatial column handling
+DO $$ 
+BEGIN
+    -- Try to enable PostGIS
+    BEGIN
+        CREATE EXTENSION IF NOT EXISTS postgis;
+        CREATE EXTENSION IF NOT EXISTS postgis_topology;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'PostGIS extension not available. Spatial features will be disabled.';
+    END;
+END $$;
 
--- Create ENUM types
-CREATE TYPE user_role AS ENUM ('patient', 'clinic_owner', 'clinic_admin', 'hb_admin', 'sys_admin');
-CREATE TYPE appointment_status AS ENUM ('scheduled', 'confirmed', 'cancelled', 'completed');
-CREATE TYPE specialization_type AS ENUM ('cardiology', 'neurology', 'orthopedics', 'pediatrics', 'dermatology', 'psychiatry', 'urology', 'oncology', 'general_practice', 'surgery');
+-- Create ENUM types safely
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('patient', 'clinic_owner', 'clinic_admin', 'hb_admin', 'sys_admin');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'appointment_status') THEN
+        CREATE TYPE appointment_status AS ENUM ('scheduled', 'confirmed', 'cancelled', 'completed');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'specialization_type') THEN
+        CREATE TYPE specialization_type AS ENUM ('cardiology', 'neurology', 'orthopedics', 'pediatrics', 'dermatology', 'psychiatry', 'urology', 'oncology', 'general_practice', 'surgery');
+    END IF;
+END $$;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -23,11 +39,11 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_clinic_id ON users(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_clinic_id ON users(clinic_id);
 
--- Clinics table
+-- Clinics table (Core columns)
 CREATE TABLE IF NOT EXISTS clinics (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -41,7 +57,6 @@ CREATE TABLE IF NOT EXISTS clinics (
   postal_code VARCHAR(20),
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
-  location GEOGRAPHY(POINT, 4326),
   website VARCHAR(500),
   image_url VARCHAR(500),
   is_verified BOOLEAN DEFAULT FALSE,
@@ -54,11 +69,21 @@ CREATE TABLE IF NOT EXISTS clinics (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_clinics_owner_id ON clinics(owner_id);
-CREATE INDEX idx_clinics_city ON clinics(city);
-CREATE INDEX idx_clinics_verified ON clinics(is_verified);
-CREATE INDEX idx_clinics_active ON clinics(is_active);
-CREATE INDEX idx_clinics_location ON clinics USING GIST(location);
+-- Safely add PostGIS columns if extension is available
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clinics' AND column_name = 'location') THEN
+            ALTER TABLE clinics ADD COLUMN location GEOGRAPHY(POINT, 4326);
+            EXECUTE 'CREATE INDEX IF NOT EXISTS idx_clinics_location ON clinics USING GIST(location)';
+        END IF;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_clinics_owner_id ON clinics(owner_id);
+CREATE INDEX IF NOT EXISTS idx_clinics_city ON clinics(city);
+CREATE INDEX IF NOT EXISTS idx_clinics_verified ON clinics(is_verified);
+CREATE INDEX IF NOT EXISTS idx_clinics_active ON clinics(is_active);
 
 -- Services table
 CREATE TABLE IF NOT EXISTS services (
@@ -72,7 +97,7 @@ CREATE TABLE IF NOT EXISTS services (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_services_clinic_id ON services(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_services_clinic_id ON services(clinic_id);
 
 -- Medicines table
 CREATE TABLE IF NOT EXISTS medicines (
@@ -84,7 +109,7 @@ CREATE TABLE IF NOT EXISTS medicines (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_medicines_name ON medicines(name);
+CREATE INDEX IF NOT EXISTS idx_medicines_name ON medicines(name);
 
 -- Medicine Inventory table
 CREATE TABLE IF NOT EXISTS medicine_inventory (
@@ -99,8 +124,8 @@ CREATE TABLE IF NOT EXISTS medicine_inventory (
   UNIQUE(clinic_id, medicine_id)
 );
 
-CREATE INDEX idx_medicine_inventory_clinic_id ON medicine_inventory(clinic_id);
-CREATE INDEX idx_medicine_inventory_medicine_id ON medicine_inventory(medicine_id);
+CREATE INDEX IF NOT EXISTS idx_medicine_inventory_clinic_id ON medicine_inventory(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_medicine_inventory_medicine_id ON medicine_inventory(medicine_id);
 
 -- Appointments table
 CREATE TABLE IF NOT EXISTS appointments (
@@ -117,10 +142,10 @@ CREATE TABLE IF NOT EXISTS appointments (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_appointments_patient_id ON appointments(patient_id);
-CREATE INDEX idx_appointments_clinic_id ON appointments(clinic_id);
-CREATE INDEX idx_appointments_status ON appointments(status);
-CREATE INDEX idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_clinic_id ON appointments(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
 
 -- Reviews table
 CREATE TABLE IF NOT EXISTS reviews (
@@ -134,9 +159,9 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_reviews_patient_id ON reviews(patient_id);
-CREATE INDEX idx_reviews_clinic_id ON reviews(clinic_id);
-CREATE INDEX idx_reviews_rating ON reviews(rating);
+CREATE INDEX IF NOT EXISTS idx_reviews_patient_id ON reviews(patient_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_clinic_id ON reviews(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
 
 -- Saved Clinics table
 CREATE TABLE IF NOT EXISTS saved_clinics (
@@ -147,8 +172,8 @@ CREATE TABLE IF NOT EXISTS saved_clinics (
   UNIQUE(patient_id, clinic_id)
 );
 
-CREATE INDEX idx_saved_clinics_patient_id ON saved_clinics(patient_id);
-CREATE INDEX idx_saved_clinics_clinic_id ON saved_clinics(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_saved_clinics_patient_id ON saved_clinics(patient_id);
+CREATE INDEX IF NOT EXISTS idx_saved_clinics_clinic_id ON saved_clinics(clinic_id);
 
 -- Notifications table
 CREATE TABLE IF NOT EXISTS notifications (
@@ -162,8 +187,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 
 -- Specializations table
 CREATE TABLE IF NOT EXISTS specializations (
@@ -174,8 +199,8 @@ CREATE TABLE IF NOT EXISTS specializations (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_specializations_name ON specializations(name);
-CREATE INDEX idx_specializations_type ON specializations(type);
+CREATE INDEX IF NOT EXISTS idx_specializations_name ON specializations(name);
+CREATE INDEX IF NOT EXISTS idx_specializations_type ON specializations(type);
 
 -- Doctors table
 CREATE TABLE IF NOT EXISTS doctors (
@@ -192,9 +217,9 @@ CREATE TABLE IF NOT EXISTS doctors (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_doctors_user_id ON doctors(user_id);
-CREATE INDEX idx_doctors_clinic_id ON doctors(clinic_id);
-CREATE INDEX idx_doctors_license_number ON doctors(license_number);
+CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON doctors(user_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_clinic_id ON doctors(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_license_number ON doctors(license_number);
 
 -- Doctor Specializations junction table
 CREATE TABLE IF NOT EXISTS doctor_specializations (
@@ -205,8 +230,8 @@ CREATE TABLE IF NOT EXISTS doctor_specializations (
   UNIQUE(doctor_id, specialization_id)
 );
 
-CREATE INDEX idx_doctor_specializations_doctor_id ON doctor_specializations(doctor_id);
-CREATE INDEX idx_doctor_specializations_specialization_id ON doctor_specializations(specialization_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_specializations_doctor_id ON doctor_specializations(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_specializations_specialization_id ON doctor_specializations(specialization_id);
 
 -- Clinic Services Specializations (clinics can offer specialized services)
 CREATE TABLE IF NOT EXISTS clinic_service_specializations (
@@ -217,8 +242,8 @@ CREATE TABLE IF NOT EXISTS clinic_service_specializations (
   UNIQUE(service_id, specialization_id)
 );
 
-CREATE INDEX idx_clinic_service_specializations_service_id ON clinic_service_specializations(service_id);
-CREATE INDEX idx_clinic_service_specializations_specialization_id ON clinic_service_specializations(specialization_id);
+CREATE INDEX IF NOT EXISTS idx_clinic_service_specializations_service_id ON clinic_service_specializations(service_id);
+CREATE INDEX IF NOT EXISTS idx_clinic_service_specializations_specialization_id ON clinic_service_specializations(specialization_id);
 
 -- Service Medicines junction table
 CREATE TABLE IF NOT EXISTS service_medicines (
@@ -230,5 +255,5 @@ CREATE TABLE IF NOT EXISTS service_medicines (
   UNIQUE(service_id, medicine_id)
 );
 
-CREATE INDEX idx_service_medicines_service_id ON service_medicines(service_id);
-CREATE INDEX idx_service_medicines_medicine_id ON service_medicines(medicine_id);
+CREATE INDEX IF NOT EXISTS idx_service_medicines_service_id ON service_medicines(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_medicines_medicine_id ON service_medicines(medicine_id);

@@ -41,14 +41,20 @@ async function getPostgresConnection(): Promise<pg.Client> {
 }
 
 export async function query(sql: string, values?: any[]): Promise<any> {
+  let finalSql = sql;
+  
   if (DB_TYPE === 'postgres') {
+    // Convert ? to $1, $2, etc. for PostgreSQL
+    let index = 1;
+    finalSql = sql.replace(/\?/g, () => `$${index++}`);
+    
     const client = await getPostgresConnection();
-    const result = await client.query(sql, values);
+    const result = await client.query(finalSql, values);
     return result.rows;
   } else {
     const conn = await getMysqlConnection();
     try {
-      const [rows] = await conn.execute(sql, values);
+      const [rows] = await conn.execute(finalSql, values);
       return rows;
     } finally {
       conn.release();
@@ -74,4 +80,28 @@ export async function closeConnections(): Promise<void> {
     await pgClient.end();
     pgClient = null;
   }
+}
+
+// Check for PostGIS availability
+let hasPostGIS = false;
+
+export async function checkPostGIS(): Promise<boolean> {
+  if (DB_TYPE !== 'postgres') return false;
+  try {
+    const result = await queryOne("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') as exists");
+    hasPostGIS = result && result.exists;
+    return hasPostGIS;
+  } catch (error) {
+    hasPostGIS = false;
+    return false;
+  }
+}
+
+export function isPostGISAvailable(): boolean {
+  return hasPostGIS;
+}
+
+// Initialize PostGIS check
+if (DB_TYPE === 'postgres') {
+  checkPostGIS().catch(err => console.error('Error checking PostGIS:', err));
 }

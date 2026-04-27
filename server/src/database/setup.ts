@@ -124,14 +124,8 @@ async function setupPostgres() {
     const schemaPath = path.join(__dirname, 'schemas', 'postgres-schema.sql');
     if (fs.existsSync(schemaPath)) {
       const schema = fs.readFileSync(schemaPath, 'utf-8');
-      const statements = schema.split(';').filter(stmt => stmt.trim());
-      
-      for (const statement of statements) {
-        if (statement.trim()) {
-          await dbClient.query(statement);
-        }
-      }
-      console.log('✓ Tables created successfully');
+      await dbClient.query(schema);
+      console.log('✓ Schema executed successfully');
     }
 
     await dbClient.end();

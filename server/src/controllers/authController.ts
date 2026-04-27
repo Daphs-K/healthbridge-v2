@@ -4,6 +4,7 @@ import { AuthRequest, AuthResponse, User } from '../types/index.js';
 import * as db from '../database/connection.js';
 
 export async function register(data: AuthRequest & { first_name?: string; last_name?: string }): Promise<AuthResponse> {
+  console.log('Registration attempt with data:', { ...data, password: '***' });
   const { email, password, first_name, last_name } = data;
 
   // Validation
@@ -36,12 +37,23 @@ export async function register(data: AuthRequest & { first_name?: string; last_n
   const hashedPassword = await bcryptjs.hash(password, salt);
 
   // Create user in database
-  const result = await db.execute(
-    'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)',
-    [email, hashedPassword, first_name || null, last_name || null, 'patient']
-  );
+  const isPostgres = process.env.DB_TYPE === 'postgres';
+  const insertQuery = isPostgres
+    ? 'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?) RETURNING id'
+    : 'INSERT INTO users (email, password, first_name, last_name, role) VALUES (?, ?, ?, ?, ?)';
 
-  const userId = (result as any).insertId || (result as any)[0]?.id;
+  const result = await db.execute(insertQuery, [email, hashedPassword, first_name || null, last_name || null, 'patient']);
+  
+  console.log('Registration database result:', result);
+  
+  let userId;
+  if (isPostgres) {
+    userId = result[0].id;
+  } else {
+    userId = (result as any).insertId;
+  }
+
+  console.log('Generated userId:', userId);
 
   // Generate token
   const token = jwt.sign(

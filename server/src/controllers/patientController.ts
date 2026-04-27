@@ -4,6 +4,7 @@ import * as db from '../database/connection.js';
 export async function getDashboard(req: Request, res: Response) {
   try {
     const userId = (req as any).user.id;
+    const isPostgres = process.env.DB_TYPE === 'postgres';
 
     // Get user details
     const user = await db.queryOne(
@@ -16,12 +17,13 @@ export async function getDashboard(req: Request, res: Response) {
     }
 
     // Get upcoming appointments
+    const dateFn = isPostgres ? 'CURRENT_DATE' : 'CURDATE()';
     const appointments = await db.query(
       `SELECT a.*, c.name as clinic_name, c.address, c.city, s.name as service_name
        FROM appointments a
        LEFT JOIN clinics c ON a.clinic_id = c.id
        LEFT JOIN services s ON a.service_id = s.id
-       WHERE a.patient_id = ? AND a.appointment_date >= CURDATE() AND a.status IN ('scheduled', 'confirmed')
+       WHERE a.patient_id = ? AND a.appointment_date >= ${dateFn} AND a.status IN ('scheduled', 'confirmed')
        ORDER BY a.appointment_date ASC, a.appointment_time ASC
        LIMIT 5`,
       [userId]
@@ -40,7 +42,7 @@ export async function getDashboard(req: Request, res: Response) {
 
     // Get stats
     const appointmentCount = await db.queryOne(
-      'SELECT COUNT(*) as count FROM appointments WHERE patient_id = ? AND status IN ("scheduled", "confirmed")',
+      `SELECT COUNT(*) as count FROM appointments WHERE patient_id = ? AND status IN ('scheduled', 'confirmed')`,
       [userId]
     );
 
@@ -129,17 +131,33 @@ export async function bookAppointment(req: Request, res: Response) {
 export async function getSavedClinics(req: Request, res: Response) {
   try {
     const userId = (req as any).user.id;
+    const isPostgres = process.env.DB_TYPE === 'postgres';
 
-    const clinics = await db.query(
-      `SELECT c.*, COUNT(DISTINCT r.id) as review_count, AVG(r.rating) as avg_rating
-       FROM saved_clinics sc
-       JOIN clinics c ON sc.clinic_id = c.id
-       LEFT JOIN reviews r ON c.id = r.clinic_id
-       WHERE sc.patient_id = ?
-       GROUP BY c.id
-       ORDER BY sc.created_at DESC`,
-      [userId]
-    );
+    let clinics;
+    if (isPostgres) {
+      clinics = await db.query(
+        `SELECT c.id, c.name, c.address, c.city, c.phone, c.image_url, c.rating, c.total_reviews,
+                COUNT(DISTINCT r.id) as review_count, AVG(r.rating) as avg_rating
+         FROM saved_clinics sc
+         JOIN clinics c ON sc.clinic_id = c.id
+         LEFT JOIN reviews r ON c.id = r.clinic_id
+         WHERE sc.patient_id = ?
+         GROUP BY c.id, c.name, c.address, c.city, c.phone, c.image_url, c.rating, c.total_reviews, sc.created_at
+         ORDER BY sc.created_at DESC`,
+        [userId]
+      );
+    } else {
+      clinics = await db.query(
+        `SELECT c.*, COUNT(DISTINCT r.id) as review_count, AVG(r.rating) as avg_rating
+         FROM saved_clinics sc
+         JOIN clinics c ON sc.clinic_id = c.id
+         LEFT JOIN reviews r ON c.id = r.clinic_id
+         WHERE sc.patient_id = ?
+         GROUP BY c.id
+         ORDER BY sc.created_at DESC`,
+        [userId]
+      );
+    }
 
     res.json(clinics);
   } catch (error) {
@@ -204,9 +222,11 @@ export async function updateProfile(req: Request, res: Response) {
   try {
     const userId = (req as any).user.id;
     const { first_name, last_name, phone } = req.body;
+    const isPostgres = process.env.DB_TYPE === 'postgres';
+    const nowFn = isPostgres ? 'CURRENT_TIMESTAMP' : 'NOW()';
 
     await db.execute(
-      'UPDATE users SET first_name = ?, last_name = ?, phone = ?, updated_at = NOW() WHERE id = ?',
+      `UPDATE users SET first_name = ?, last_name = ?, phone = ?, updated_at = ${nowFn} WHERE id = ?`,
       [first_name, last_name, phone, userId]
     );
 
