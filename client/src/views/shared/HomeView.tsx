@@ -1,36 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../../components/shared/Icon';
+import Header from '../../components/shared/Header';
 
 const HomeView: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-purple flex items-center justify-center">
-              <span className="text-white font-bold">+</span>
-            </div>
-            <span className="font-bold text-xl">HealthBridge</span>
-          </Link>
-          
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#services" className="text-neutral-700 hover:text-primary-600 transition-colors">Services</a>
-            <a href="#why-us" className="text-neutral-700 hover:text-primary-600 transition-colors">Why Us</a>
-            <a href="#team" className="text-neutral-700 hover:text-primary-600 transition-colors">Team</a>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link to="/login" className="text-neutral-700 hover:text-primary-600 font-semibold transition-colors">
-              Sign in
-            </Link>
-            <Link to="/register" className="px-6 py-2 rounded-lg bg-gradient-purple text-white font-semibold hover:shadow-lg transition-all">
-              Get Started
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Header />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-neutral-50 via-primary-50 to-neutral-100 py-20 md:py-32">

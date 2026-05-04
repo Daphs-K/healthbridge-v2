@@ -6,6 +6,7 @@ import { Clinic, SearchFilters, Specialization } from '../../types';
 import FilterSidebar from '../../components/search/FilterSidebar';
 import ClinicCard from '../../components/search/ClinicCard';
 import QuickBookModal from '../../components/search/QuickBookModal';
+import Header from '../../components/shared/Header';
 import '../../styles/search.css';
 
 // Fix Leaflet default marker icons
@@ -84,10 +85,12 @@ const SearchView: React.FC = () => {
   };
 
   return (
-    <div className="search-container">
-      <div className="search-header">
-        <h1>Find & Book Healthcare Services</h1>
-        <div className="view-toggle">
+    <>
+      <Header />
+      <div className="search-container">
+        <div className="search-header">
+          <h1>Find & Book Healthcare Services</h1>
+          <div className="view-toggle">
           <button
             className={`toggle-btn ${view === 'map' ? 'active' : ''}`}
             onClick={() => setView('map')}
@@ -198,7 +201,8 @@ const SearchView: React.FC = () => {
           }}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 };
 
