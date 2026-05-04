@@ -136,6 +136,11 @@ const RegisterView: React.FC = () => {
             name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleSubmit(e as any);
+              }
+            }}
             placeholder="••••••••"
             className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
           />
