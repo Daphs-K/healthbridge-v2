@@ -83,7 +83,7 @@ const LoginView: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 px-4 rounded-lg bg-gradient-purple text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 px-4 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
@@ -98,10 +98,14 @@ const LoginView: React.FC = () => {
 
       {/* Social Login */}
       <div className="space-y-3">
+        <button className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-all">
           <Icon name="google" size={20} />
           <span className="font-semibold text-neutral-900">Google</span>
+        </button>
+        <button className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-all">
           <Icon name="apple" size={20} />
           <span className="font-semibold text-neutral-900">Apple</span>
+        </button>
       </div>
 
       {/* Sign Up Link */}
@@ -116,3 +120,4 @@ const LoginView: React.FC = () => {
 };
 
 export default LoginView;
+
